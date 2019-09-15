@@ -1,0 +1,152 @@
+#!/bin/bash
+
+VERSION="0.1.0"
+
+setup() {
+    # Set up temporary files
+    TMPDIR=$TMPDIR/gld
+    if [ ! -d $TMPDIR ]; then mkdir $TMPDIR; fi
+    OLD=$TMPDIR/old.tex
+    NEW=$TMPDIR/new.tex
+
+    # Ensure we are in the root directory
+    git_dir="$(git rev-parse --git-dir)"   # Determine git directory
+    cd "$(git rev-parse --show-cdup)"      # cd to root
+
+    DIFFDIR=./diff
+    if $no_overwrite; then
+        if [ -d $DIFFDIR ]; then
+            echo -n "Output dir \""$DIFFDIR"\" already exists. "
+            if ! $force; then
+                echo "Exiting."
+                exit
+            else
+                echo "Overwriting."
+                rm -r $DIFFDIR
+            fi
+        fi
+        mkdir $DIFFDIR
+    fi
+}
+
+teardown() {
+    dirs=($TMPDIR)
+    for d in ${dirs[@]}; do
+        if [ -d $d ]; then
+            rm -r $d
+        fi
+    done
+}
+
+usage() {
+    cat << EOF    
+gld: git latexdiff
+
+Calls latexdiff on all .tex files in the current directory, recrusively, between 
+the current versions and the specified git commit. If no commit is provided, uses
+HEAD~1.
+
+Usage
+  $(basename "$0") [options] [OLD]
+
+Options
+  -h --help        Show help
+  -f               Force.
+  --no-overwite    Writes latexdiff to separate files.
+  -v --verbose     Verbose
+  --version        Print version and exit
+EOF
+}
+
+process_args() {
+    # Default args
+    no_overwrite=false
+    verbose=false
+    force=false
+    
+    POSITIONAL=()
+    while [[ $# -gt 0 ]]
+    do
+    key="$1"
+    
+    # process key/value args
+    case $1 in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -f)
+            force=true
+            shift
+            ;;
+        --no-overwrite)
+            no_overwrite=true
+            shift
+            ;;
+        -v|--verbose)
+            verbose=true
+            shift
+            ;;
+        --version)
+            echo "gld v$VERSION"
+            exit 0
+            ;;
+        # case $key in
+        #     -e|--extension)
+        #     EXTENSION="$2"
+        #     shift # past argument
+        #     shift # past value
+        *)    # unknown option
+            if [ ${1:0:1} == - ]; then
+                echo "Unrecognized option \""$1"\""
+                exit
+            fi
+            POSITIONAL+=("$1") # save it in an array for later
+            shift # past argument
+            ;;
+    esac
+    done
+
+    # process positional args
+    if [ ${#POSITIONAL[@]} -gt 0 ]; then
+        commit=${POSITIONAL[0]}
+        git cat-file -e $commit > /dev/null 2>&1
+        if [ ! $? -eq 0 ]; then
+           echo "Invalid commit \""$commit"\""
+           exit
+        fi
+    else
+        commit="HEAD~1"
+    fi
+}
+
+run_diff() {
+    files=$(find . -type f -name '*.tex')
+    
+    for f in $files; do
+        if $no_overwrite; then
+            dest=$DIFFDIR/$f
+        else
+            dest=$f
+        fi
+
+        git show $commit:$f > $OLD
+        latexdiff $OLD $f > $NEW
+
+        mv $NEW $dest
+                
+        if $verbose; then echo "$f > $dest"; fi
+    done
+}
+    
+main() {
+    process_args $@
+
+    setup
+    
+    run_diff
+
+    teardown
+}
+
+main $@
