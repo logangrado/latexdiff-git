@@ -3,7 +3,7 @@
 # Author: Logan Grado <https://github.com/logangrado>
 # License: GNU GLP-3.0
 
-VERSION="0.1.0"
+VERSION="0.2.0"
 
 setup() {
     # Set up temporary files
@@ -16,20 +16,20 @@ setup() {
     git_dir="$(git rev-parse --git-dir)"   # Determine git directory
     cd "$(git rev-parse --show-cdup)"      # cd to root
 
-    DIFFDIR=./diff
-    if $no_overwrite; then
-        if [ -d $DIFFDIR ]; then
-            echo -n "Output dir \""$DIFFDIR"\" already exists. "
-            if ! $force; then
-                echo "Exiting."
-                exit
-            else
-                echo "Overwriting."
-                rm -r $DIFFDIR
-            fi
-        fi
-        mkdir $DIFFDIR
-    fi
+    if [ ! -d $OUTDIR ]; then mkdir $OUTDIR; fi
+    # if $no_overwrite; then
+    #     if [ -d $DIFFDIR ]; then
+    #         echo -n "Output dir \""$DIFFDIR"\" already exists. "
+    #         if ! $force; then
+    #             echo "Exiting."
+    #             exit
+    #         else
+    #             echo "Overwriting."
+    #             rm -r $DIFFDIR
+    #         fi
+    #     fi
+    #     mkdir $DIFFDIR
+    # fi
 }
 
 teardown() {
@@ -53,9 +53,10 @@ Usage
   $(basename "$0") [options] [OLD]
 
 Options
+  -d --dry         Dry run - show what would be done.
+  -f               Force
   -h --help        Show help
-  -f               Force.
-  --no-overwite    Writes latexdiff to separate files.
+  --outdir <DIR>   Output directory. [Defaults to ./]
   -v --verbose     Verbose
   --version        Print version and exit
 EOF
@@ -64,8 +65,10 @@ EOF
 process_args() {
     # Default args
     no_overwrite=false
-    verbose=false
-    force=false
+    VERBOSE=false
+    FORCE=false
+    OUTDIR=./
+    DRY=false
     
     POSITIONAL=()
     while [[ $# -gt 0 ]]
@@ -74,31 +77,31 @@ process_args() {
     
     # process key/value args
     case $1 in
+        -d|--dry)
+            DRY=true
+            shift
+            ;;
         -h|--help)
             usage
             exit 0
             ;;
         -f)
-            force=true
-            shift
-            ;;
-        --no-overwrite)
-            no_overwrite=true
+            FORCE=true
             shift
             ;;
         -v|--verbose)
-            verbose=true
+            VERBOSE=true
             shift
             ;;
         --version)
-            echo "gld v$VERSION"
+            echo "$(basename "$0") version $VERSION"
             exit 0
             ;;
-        # case $key in
-        #     -e|--extension)
-        #     EXTENSION="$2"
-        #     shift # past argument
-        #     shift # past value
+        --outdir)
+            OUTDIR=$2
+            shift
+            shift
+            ;;
         *)    # unknown option
             if [ ${1:0:1} == - ]; then
                 echo "Unrecognized option \""$1"\""
@@ -123,28 +126,52 @@ process_args() {
     fi
 }
 
+fatal() {
+    echo "fatal: $*"
+    exit 1
+}
+
+warn() {
+    echo "warning: $*"
+}
+
 run_diff() {
-    files=$(find . -type f -name '*.tex')
+    if $DRY; then echo "Dry run:"; fi
     
-    for f in $files; do
-        if $no_overwrite; then
-            dest=$DIFFDIR/$f
-        else
-            dest=$f
+    FILES=$(find . -type f -name '*.tex')
+    
+    for f in $FILES; do
+        DEST=$OUTDIR/$f
+        DEST=$(realpath -q $DEST --relative-to=./)
+        
+        OLD_CONTENTS=$(git show $commit:$f 2> /dev/null)
+        if [ $? != 0 ]; then
+            warn "File '"$f"' does not exist on '"$commit"'. Skipping."
+            continue
         fi
+        
+        echo "$f > $DEST"
 
-        git show $commit:$f > $OLD
-        latexdiff $OLD $f > $NEW
+        if ! $DRY; then
+            echo "$OLD_CONTENTS" > $OLD
+            latexdiff $OLD $f > $NEW
 
-        mv $NEW $dest
-                
-        if $verbose; then echo "$f > $dest"; fi
+            if [ ! -d $(dirname $DEST) ]; then
+                mkdir -p $(dirname $DEST)
+            fi
+            
+            mv $NEW $DEST
+        fi
     done
 }
     
 main() {
+    if ! git rev-parse --git-dir > /dev/null 2>&1; then
+        fatal "Not a git repostiroy"
+    fi
+        
     process_args $@
-
+    
     setup
     
     run_diff
