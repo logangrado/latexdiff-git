@@ -44,7 +44,11 @@ For help, use `-h` or `--help`
 latexdiff-git -h
 ```
 
+## Changelog
+See [CHANGELOG](docs/CHANGELOG.md)
+
 ## Alternatives
 
-#### [git-latexdiff](https://gitlab.com/git-latexdiff/git-latexdiff) 
-git-latexdiff automaticaly generates a diff'ed PDF between commits, and is very useful for quickly visualizing changes in `.tex` files between commits. However, if you're interested in combing through those diff's one by one in the `.tex`, it falls short. Not only does git-latexdiff flatten all source files into one big diff, but it also generates the diff in a temp directory. Personally, I prefer the diff files to overwrite my current files, which makes it far easier to find and resolve all the diffs.
+- [git-latexdiff](https://gitlab.com/git-latexdiff/git-latexdiff) 
+
+  git-latexdiff automaticaly generates a diff'ed PDF between commits, and is very useful for quickly visualizing changes in   `.tex` files between commits. However, if you're interested in combing through those diff's one by one in the `.tex`, it falls short. Not only does git-latexdiff flatten all source files into one big diff, but it also generates the diff in a temp directory. Personally, I prefer the diff files to overwrite my current files, which makes it far easier to find and resolve all the diffs.
