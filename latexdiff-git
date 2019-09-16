@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Author: Logan Grado <https://github.com/logangrado>
+# License: GNU GLP-3.0
+
 VERSION="0.1.0"
 
 setup() {
