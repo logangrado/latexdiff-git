@@ -3,7 +3,7 @@
 # Author: Logan Grado <https://github.com/logangrado>
 # License: GNU GLP-3.0
 
-VERSION="0.2.0"
+VERSION="0.3.0"
 
 setup() {
     # Set up temporary files
@@ -164,13 +164,32 @@ run_diff() {
         fi
     done
 }
-    
+
+check_git_status() {
+    INDEX=$(git status --untracked-files=no --porcelain 2> /dev/null)
+    STATUS=""
+
+    if [ -z "$INDEX" ]; then
+        STATUS=clean
+    else
+        STATUS=unclean
+    fi
+
+    if [ $STATUS = unclean ] && [ $FORCE = false ]; then
+        echo "Error: Untracked changes present."
+        echo "If you are sure you want to continue, use '-f|--force'"
+        exit
+    fi
+}
+
 main() {
     if ! git rev-parse --git-dir > /dev/null 2>&1; then
         fatal "Not a git repostiroy"
     fi
         
     process_args $@
+    
+    check_git_status
     
     setup
     
